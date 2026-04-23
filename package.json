@@ -1,0 +1,14 @@
+{
+  "name": "amogh-torrent",
+  "version": "1.0.0",
+  "description": "A bit Torrent client built using node.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Amogh Bhat Nagri",
+  "license": "ISC",
+  "dependencies": {
+    "fs": "^0.0.1-security"
+  }
+}
