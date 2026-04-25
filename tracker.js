@@ -2,15 +2,16 @@
 
 import dgram from 'dgram'; 
 import { Buffer } from 'node:buffer'; // not required 
-import { URL } from 'node:url'; // not required
+import { parse as urlParse } from 'url'; // not required
 import crypto from 'node:crypto'; // to create a random number for the buffer
-import torrentParser from './torrent-parser'; 
-import util from './util';
+import { size, infoHash } from './torrent-parser.js'; 
+import util from './util.js';
 
 export const getPeers = (torrent, callback) => {
     const socket = dgram.createSocket('udp4'); 
-    const torrent = torrent.announce.toString('utf8'); 
-    
+    const url = Buffer.from(torrent.announce).toString('utf8'); // bencode.decode return a Uint8Array not a Node Buffer
+                                                                // hence torrent.announce.toString() will return the string version of the array not the url
+
     //send connection request 
     udpSend(socket, buildConnReq(), url); 
 
@@ -18,7 +19,7 @@ export const getPeers = (torrent, callback) => {
         if (resType(response) == 'connect') {
             const connResp = parseConnResp(response) 
             //send announce request 
-            const announceReq = buildAnnounceReq(connResp.connection_id); 
+            const announceReq = buildAnnounceReq(connResp.connection_id, torrent); 
             udpSend(socket, announceReq, url); 
         } else if (resType(response) == 'announce') {
             const announceResp = parseAnnounceResp(response); 
@@ -29,12 +30,20 @@ export const getPeers = (torrent, callback) => {
 }; 
 
 function udpSend(socket, message, rawURL, callback=()=>{}) {
-    const url = urlParse(rawURL); 
+    const urlStr = Buffer.isBuffer(rawURL) ? 
+        rawURL.toString('utf8') : 
+        rawURL; 
+    console.log('url str: ',urlStr); 
+    console.log("typeof urlStr ", typeof urlStr);
+
+    const url = urlParse(urlStr);
     socket.send(message, 0, message.length, Number(url.port), url.hostname, callback); 
 }
 
 function resType(response) {
-
+    const action = response.readUint32BE(0); 
+    if (action == 0) return 'connect'; 
+    if (action == 1) return 'annunce';
 }
 
 function buildConnReq() {
@@ -42,8 +51,8 @@ function buildConnReq() {
 
     // node.js does not support precise 64 bit integers
     //connection id using magic constant = 0x41727101980 split into two 32 bit integers, hence the two writeBigUint64BE's used
-    buf.writeBigUint64BE(0x417, 0); // writeBigUint64BE - writes 32 bit unsigned integer in big endian format
-    buf.writeBigUint64BE(0x27101980, 4); //starting from 27 but offset by 4, i.e. the index of 27 is 4 
+    buf.writeUInt32BE(0x417, 0); // writeBigUint64BE - writes 32 bit unsigned integer in big endian format
+    buf.writeUInt32BE(0x27101980, 4); //starting from 27 but offset by 4, i.e. the index of 27 is 4 
     //action
     buf.writeUint32BE(0, 8); // writes 0 at offset 8 which means connect
     //transaction id 
@@ -68,10 +77,10 @@ function buildAnnounceReq(response) {
     connId.copy(buf, 0); // 1
     buf.writeUint32BE(1, 8);  // 2
     crypto.randomBytes(4).copy(buf, 12); // 3
-    torrentParser.infoHash(torrent).copy(buf, 16); // 4
+    infoHash(torrent).copy(buf, 16); // 4
     util.genId().copy(buf, 36); // 5
     Buffer.alloc(8).copy(buf, 56); // 6
-    torrentParser.size(torrent).copy(buf, 64); // 7 -> sends the whole size of torrent files
+    size(torrent).copy(buf, 64); // 7 -> sends the whole size of torrent files
     Buffer.alloc(8).copy(buf, 72); // 8
     buf.writeUint32BE(0, 80); // 9
     buf.writeUint32BE(0, 80); // 10
