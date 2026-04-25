@@ -63,20 +63,21 @@ function parseConnReq(response) {
 function buildAnnounceReq(response) {
     const buf = Buffer.allocUnsafe(98); 
 
-    // connectoinId, action, transactionId, infoHash, peerId, downloaded, left, uploaded, event, ipAdd, key, num want, port in the same order
-    connId.copy(buf, 0); 
-    buf.writeUint32BE(1, 8); 
-    crypto.randomBytes(4).copy(buf, 12); 
-    torrentParser.infoHash(torrent).copy(buf, 16); 
-    util.genId().copy(buf, 36); 
-    Buffer.alloc(8).copy(buf, 56);
-    torrentParser.size(torrent).copy(buf, 64); 
-    Buffer.alloc(8).copy(buf, 72);
-    buf.writeUint32BE(0, 80); 
-    buf.writeUint32BE(0, 80); 
-    crypto.randomBytes(4).copy(buf, 88); 
-    buf.writeint32BE(-1, 92); 
-    buf.writeUint16BE(port, 96); 
+    // 1.connectoinId, 2.action, 3.transactionId, 4.infoHash, 5.peerId, 6.downloaded,
+    // 7.left, 8.uploaded, 9.event, 10.ipAdd, 11.key, 12.num want, 13.port 
+    connId.copy(buf, 0); // 1
+    buf.writeUint32BE(1, 8);  // 2
+    crypto.randomBytes(4).copy(buf, 12); // 3
+    torrentParser.infoHash(torrent).copy(buf, 16); // 4
+    util.genId().copy(buf, 36); // 5
+    Buffer.alloc(8).copy(buf, 56); // 6
+    torrentParser.size(torrent).copy(buf, 64); // 7 -> sends the whole size of torrent files
+    Buffer.alloc(8).copy(buf, 72); // 8
+    buf.writeUint32BE(0, 80); // 9
+    buf.writeUint32BE(0, 80); // 10
+    crypto.randomBytes(4).copy(buf, 88); // 11 
+    buf.writeint32BE(-1, 92); // 12
+    buf.writeUint16BE(port, 96); // 13
 
     return buf;
 }
