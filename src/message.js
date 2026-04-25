@@ -67,9 +67,13 @@ const buildHave = payload => {
     return buf;
 }
 
-const buildBitfield = payload => {
+// payload = bitfield representing pieces that have been sucessfully downloaded
+// high bit in first byte <- index 0 
+// cleared bits -> missing piece 
+// set bits -> valid and available sp
+const buildBitfield = bitfield => { 
     const buf = Buffer.alloc(14); 
-    buf.writeUInt32BE(payload.length+1,0); // length   
+    buf.writeUInt32BE(bitfield.length+1,0); // length -> variable length
     buf.writeUInt8(5,4); // id
     buf.writeUInt32BE(buf, 5) // bitfield
     return buf;
