@@ -1,28 +1,40 @@
 'use strict' 
 
+import * as tp from './torrent-parser.js';
+
 export default class {
     constructor (size) {
-        this.requested = new Array(size).fill(false); 
-        this.recieved = new Array(size).fill(false);
+        function buildPiecesArray() {
+            const nPieces = torrent.info.pieces.length / 20;
+            const arr = new Array(nPieces).fill(null);
+            return arr.map((_, i) => new Array(tp.blocksPerPiece(torrent, i)).fill(false));
+        }
+
+        this._requested = buildPiecesArray(); 
+        this._recieved = buildPiecesArray();
     }
 
-    addRequested(pieceIndex) {
-        this.requested[pieceIndex] = true; 
+    addRequested(pieceBlock) {
+        const blockIndex = pieceBlock.begin / tp.BLOCK_LEN; 
+        this._requested[pieceBlock.index][blockIndex] = true; 
     }
 
-    addRecieved(pieceIndex) {
-        this.recieved[pieceIndex] = true; 
+    addRecieved(pieceBlock) {
+        const blockIndex = pieceBlock.begin / tp.BLOCK_LEN; 
+        this._recieved[pieceBlock.index][blockIndex] = true; 
     }
 
-    needed(pieceIndex) {
-        if (this.requested.every(i => i === true)) {
+    needed(pieceBlock) {
+        if (this._requested.every(blocks => blocks.every(i => i))) {
             // if all pieces are requested then copy recieved to requested to identify missing pieces
-            this.requested = this.recieved.slice(); 
+            this._requested = this._recieved.map(blocks => blocks.slice()); 
         } 
-        return !this.requested[pieceIndex]; 
+
+        const blockIndex = pieceBlock.begin / tp.BLOCK_LEN; 
+        return !this.requested[pieceBlock.index][blockIndex]; 
     }
 
     isDone() {
-        return this.requested.every(i => i === true);
+        return this._requested.every(blocks => blocks.every(i => i));
     }
 }
