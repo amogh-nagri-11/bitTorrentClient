@@ -2,16 +2,18 @@
 
 import net from 'node:net'; 
 import { Buffer } from 'node:buffer'; 
+import fs from 'fs';
 
 import { getPeers } from './tracker.js';
 import message from './message.js';
 import Pieces from './Pieces.js';
 import Queue from './Queue.js';
 
-export default torrent => {
+export default (torrent, path) => {
     getPeers(torrent, peers => {
         const pieces = new Pieces(torrent);
-        peers.forEach(peer => download(peer, torrent, pieces));
+        const file = fs.openSync(path, 'w');
+        peers.forEach(peer => download(peer, torrent, pieces, file));
     }); 
 }; 
 
@@ -88,8 +90,20 @@ function bitfieldHandler(socket, pieces, queue, payload) {
     if (queueEmpty) requestPiece(socket, pieces, queue);
 };
 
-function pieceHandler(payload, socket, requested, queue) {
+function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
+    console.log(pieceResp);
+    pieces.addRecieved(pieceResp);
 
+    const offset = pieceResp.index * torrent.info['piece length'] + pieceResp.begin;
+    fs.write(file, pieceResp.block, 0, pieceResp.block.length, offset, ()=>{});
+
+    if (pieces.isDone()) {
+        console.log("DONE!");
+        socket.end(); 
+        try { fs.closeSync(file); } catch (e) {}
+    } else {
+        requestPiece(socket, pieces, queue);
+    }
 };
 
 function requestPiece(socket, pieces, queue) {
