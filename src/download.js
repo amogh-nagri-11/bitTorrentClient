@@ -20,10 +20,6 @@ const download = (peer, torrent) => {
     onWholeMsg(socket, msg => msgHandler(msg, socket)); 
 }; 
 
-function msgHandler(msg, socket) {
-    if (isHandshake(msg)) socket.write(message.buildInterested());
-}; 
-
 function isHandshake(msg) {
     return msg.length === msg.readUInt8(0)+49 && msg.toString('utf8',1) === 'BitTorrent protocol';
 }
@@ -44,3 +40,37 @@ function onWholeMsg (socket, callback) {
         }
     });
 }; 
+
+function msgHandler(msg, socket) {
+    if (isHandshake(msg)) {
+        socket.write(message.buildInterested());
+    } else {
+        const m = message.parse(msg); 
+
+        if (m.id===1) chokeHandler(); 
+        if (m.id===2) unchokeHandler(); 
+        if (m.id===3) haveHandler(m.payload);
+        if (m.id===4) bitfieldHandler(m.payload); 
+        if (m.id===5) pieceHandler(m.payload);
+    }
+}; 
+
+function chokeHandler() {
+
+}; 
+
+function unchokeHandler() {
+
+};
+
+function haveHandler(payload) {
+
+};
+
+function bitfieldHandler(payload) {
+
+};
+
+function pieceHandler(payload) {
+
+};

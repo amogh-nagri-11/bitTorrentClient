@@ -14,6 +14,31 @@ import { Buffer } from 'node:buffer';
 import { open, size, infoHash } from './torrent-parser.js';
 import gendId from '../util.js';
 
+//parse messges 
+// only messages with length > 4 have ids 
+// only messages with length > 5 have payloads 
+// and only messages with id 6,7 or 8 have payloads that are split into index, begin and block length
+// refer bitTorrent spec
+const parse = msg => {
+    const id = msg.length > 4 ? msg.readUInt(8) : null;
+    let payload = msg.length > 5 ? msg.slice(5) : null; 
+
+    if (id===6 || id===7 || id===8) {
+        const rest = payload.slice(8); 
+        payload = {
+            index: payload.readUInt32BE(0), 
+            begin: payload.readUInt32BE(4),
+        }; 
+        payload[id===7 ? 'block' : 'length']=rest; 
+    }
+
+    return {
+        size: msg.readUInt32BE(0), 
+        id: id, 
+        payload: payload,
+    }
+}; 
+
 const buildHandshake = torrent => {
     const buf = Buffer.alloc(68); 
 
@@ -41,7 +66,7 @@ const buildChoke = () => {
 const buildUnchoke = () => {
     const buf = Buffer.alloc(5); 
     buf.writeUInt32BE(1,0); // length 
-    buf.writeUInt8(1,4); // ids
+    buf.writeUInt8(1,4); // id
     return buf; 
 };
 
@@ -119,6 +144,7 @@ const buildPort = payload => {
 }; 
 
 export default { 
+    parse,
     buildHandshake, 
     buildKeepAlive,
     buildChoke,
