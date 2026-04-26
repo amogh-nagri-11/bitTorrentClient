@@ -118,7 +118,7 @@ const buildPort = payload => {
     return buf;
 }; 
 
-export { 
+export default { 
     buildHandshake, 
     buildKeepAlive,
     buildChoke,
