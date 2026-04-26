@@ -2,24 +2,26 @@
 
 import net from 'node:net'; 
 import { Buffer } from 'node:buffer'; 
+
 import { getPeers } from './tracker.js';
 import message from './message.js';
+import Pieces from './Pieces.js';
 
-export const startDownload = (torrent) => {
-    const requested = [];
+export default torrent => {
     getPeers(torrent, peers => {
-        peers.forEach(peer => download(peer, torrent, requested));
+        const pieces = new Pieces(torrent.info.pieces.length / 20);
+        peers.forEach(peer => download(peer, torrent, pieces));
     }); 
 }; 
 
-const download = (peer, torrent, requested) => {
+const download = (peer, torrent, pieces) => {
     const socket = new net.socket(); 
     socket.on('error', console.log); 
     socket.connect(peer.port, peer.ip, () => {
         socket.write(message.buildHandshake(torrent)); 
     }); 
-    const queue = [];
-    onWholeMsg(socket, msg => msgHandler(msg, socket, requested, queue)); 
+    const queue = { choked: true, queue: []};
+    onWholeMsg(socket, msg => msgHandler(msg, socket, pieces, queue)); 
 }; 
 
 function isHandshake(msg) {
@@ -43,7 +45,7 @@ function onWholeMsg (socket, callback) {
     });
 }; 
 
-function msgHandler(msg, socket, requested, queue) {
+function msgHandler(msg, socket, pieces, queue) {
     if (isHandshake(msg)) {
         socket.write(message.buildInterested());
     } else {
@@ -51,18 +53,20 @@ function msgHandler(msg, socket, requested, queue) {
 
         if (m.id===0) chokeHandler(); 
         if (m.id===1) unchokeHandler(); 
-        if (m.id===4) haveHandler(m.payload, socket, requested, queue);
+        if (m.id===4) haveHandler(m.payload, socket, pieces, queue);
         if (m.id===5) bitfieldHandler(m.payload); 
-        if (m.id===7) pieceHandler(m.payload, socket, requested, queue);
+        if (m.id===7) pieceHandler(m.payload);
     }
 }; 
 
-function chokeHandler() {
-
+function chokeHandler(socket) {
+    socket.end();
 }; 
 
-function unchokeHandler() {
+function unchokeHandler(socket, pieces, queue) {
+    queue.choked = false; 
 
+    requestPiece(socket, pieces, queue);
 };
 
 function haveHandler(payload, socket, requested, queue) {
@@ -81,11 +85,15 @@ function pieceHandler(payload, socket, requested, queue) {
 
 };
 
-function requestPiece(socket, requested, queue) {
-    if (requested[piece[0]]) {
-        queue.shift(); 
-    } else {
-        // this is a pseudo queue, as buildReques actullay takes slightly more complicated arguments
-        socket.write(message.buildRequest(pieceIndex));
+function requestPiece(socket, pieces, queue) {
+    if (queue.choked) return null;
+
+    while (queue.queue.length) {
+        const pieceIndex = queue.shift(); 
+        if (pieces.needed(pieceIndex)) {
+            socket.write(message.buildRequest(piecesIndex)); 
+            pieces.addRequested(pieceIndex); 
+            break;
+        }
     }
 }; 
